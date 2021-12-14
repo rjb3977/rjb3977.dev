@@ -16,7 +16,7 @@ import OAuthInfo from "https://js.arcgis.com/4.22/@arcgis/core/identity/OAuthInf
         new OAuthInfo({
             appId: "wKnUOBiPaLjXGUG6",
             popup: false,
-            popupCallbackUrl: "http://rjb3977.dev/car-accidents/",
+            popupCallbackUrl: "https://rjb3977.dev/car-accidents/",
             expiration: 20160,
             portalUrl,
         }),
