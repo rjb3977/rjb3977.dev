@@ -1,17 +1,16 @@
-// import config from "https://js.arcgis.com/4.22/@arcgis/config.js"
 import ArcMap from "https://js.arcgis.com/4.22/@arcgis/core/Map.js";
 import WebMap from "https://js.arcgis.com/4.22/@arcgis/core/WebMap.js";
 import MapView from "https://js.arcgis.com/4.22/@arcgis/core/views/MapView.js";
 import FeatureLayer from "https://js.arcgis.com/4.22/@arcgis/core/layers/FeatureLayer.js";
-import VectorTileLayer from "https://js.arcgis.com/4.22/@arcgis/core/layers/VectorTileLayer.js";
 import PopupTemplate from "https://js.arcgis.com/4.22/@arcgis/core/PopupTemplate.js"
 import IdentityManager from "https://js.arcgis.com/4.22/@arcgis/core/identity/IdentityManager.js"
 import OAuthInfo from "https://js.arcgis.com/4.22/@arcgis/core/identity/OAuthInfo.js"
 
-
 (async () => {
+    // RIT's portal URL; we need permission to access maps from here
     const portalUrl = "http://ritarcgis.maps.arcgis.com";
 
+    // tell the library what app this is
     IdentityManager.registerOAuthInfos([
         new OAuthInfo({
             appId: "wKnUOBiPaLjXGUG6",
@@ -22,12 +21,8 @@ import OAuthInfo from "https://js.arcgis.com/4.22/@arcgis/core/identity/OAuthInf
         }),
     ]);
 
+    // if the user isn't logged in yet, redirect them to the login page
     await IdentityManager.getCredential(portalUrl);
-
-    window.ArcMap = ArcMap;
-    window.WebMap = WebMap;
-    window.MapView = MapView;
-    window.IdentityManager = IdentityManager;
 
     const map = new ArcMap({
         basemap: "arcgis-streets-night"
@@ -47,11 +42,9 @@ import OAuthInfo from "https://js.arcgis.com/4.22/@arcgis/core/identity/OAuthInf
         // }
     });
 
-    // const layers = [0, 1, 2, 3, 4, 5, 6].map(i => new VectorTileLayer({
-    //     url: `https://vectortileservices2.arcgis.com/RQcpPaCpMAXzUI5g/arcgis/rest/services/rjb3977_car_accidents_vector_tile/VectorTileServer/${i}`,
-    //     visible: false,
-    // }));
-
+    // a lot of this layer nonsense does nothing, but was supposed to help make
+    // the time extent stuff work. that did not end up working, but this still works
+    // as it is, so I don't feel the need to remove it.
     const getLayer = (name, index) => new FeatureLayer({
         url: `https://services2.arcgis.com/RQcpPaCpMAXzUI5g/arcgis/rest/services/${name}/FeatureServer/${index}`,
         visible: false,
@@ -91,6 +84,7 @@ import OAuthInfo from "https://js.arcgis.com/4.22/@arcgis/core/identity/OAuthInf
         layerMap[key] = layerMap[key].map(i => layers[i]);
     }
 
+    // set the popup template for every layer
     layers.forEach(layer => {
         layer.popupTemplate = new PopupTemplate({
             title: "{expression/count} Car Accidents",
@@ -100,7 +94,7 @@ import OAuthInfo from "https://js.arcgis.com/4.22/@arcgis/core/identity/OAuthInf
                 Severity 3: {SUM_Severity_3} <br>
                 Severity 4: {SUM_Severity_4} <br>
             `,
-            expressionInfos: [{
+            expressionInfos: [{ // for some reason {COUNT} does not work, so instead just add up the severities
                 name: "count",
                 title: "count",
                 expression: "$feature.SUM_Severity_1 + $feature.SUM_Severity_2 + $feature.SUM_Severity_3 + $feature.SUM_Severity_4"
@@ -110,6 +104,7 @@ import OAuthInfo from "https://js.arcgis.com/4.22/@arcgis/core/identity/OAuthInf
         });
     });
 
+    // change the popup template for the point layer, since it's special
     pointLayer.popupTemplate = new PopupTemplate({
         title: "Accident at {Time}",
         content: "",
@@ -117,9 +112,11 @@ import OAuthInfo from "https://js.arcgis.com/4.22/@arcgis/core/identity/OAuthInf
         actions: [],
     });
 
+    // helper functions for dealing with radio buttons
     const getInputs = name => [...document.querySelectorAll(`input[name="${name}"]`)];
     const getSelection = name => getInputs(name).find(e => e.checked).value;
 
+    // get the appropriate index in the current list of layers for the current zoom level
     const getZoomIndex = () => [
         [11, 0],
         [10, 1],
@@ -131,6 +128,7 @@ import OAuthInfo from "https://js.arcgis.com/4.22/@arcgis/core/identity/OAuthInf
         [ 4, 7],
     ].find(([z, _]) => view.zoom >= z)[1];
 
+    // change which layer is visible according to current zoom
     const updateZoom = () => {
         const i = getZoomIndex();
         layers.forEach(layer => {
@@ -138,6 +136,7 @@ import OAuthInfo from "https://js.arcgis.com/4.22/@arcgis/core/identity/OAuthInf
         });
     };
 
+    // update time based on radio buttons (does nothing, since time doesn't work)
     const updateTime = () => {
         let year = getSelection("radio-year");
 
@@ -173,34 +172,14 @@ import OAuthInfo from "https://js.arcgis.com/4.22/@arcgis/core/identity/OAuthInf
         updateZoom();
     };
 
+    // update once to get things started
     updateTime();
 
+    // watch for updates to the radio buttons (does nothing, since time doesn't work)
     document.querySelectorAll('input[name="radio-year"], input[name="radio-month"]').forEach(i => {
         i.addEventListener("change", updateTime);
     });
 
+    // watch for changes to the view's zoom
     view.watch("zoom", updateZoom);
-
-    // view.popup.autoOpenEnabled = false;
-    // view.on('click', async event => {
-    //     const hit = await view.hitTest(event, {
-    //         include: layers.filter(l => l.visible),
-    //     });
-
-    //     if (hit.results.length > 0) {
-    //         const graphics = hit.results.map(result => result.graphic);
-
-    //         console.log("hit graphics", graphics);
-
-    //         view.popup.open({
-    //             location: event.mapPoint,
-    //             features: graphics,
-    //         });
-
-    //         window.graphics = graphics;
-    //     }
-    // });
-
-    window.view = view;
-    window.layers = layers;
 })();
